@@ -1,0 +1,29 @@
+#!/usr/bin/env ruby
+
+require "rubygems"
+require_relative '.bundle/bundler/setup'
+require "google/api_client"
+require "google_drive"
+require 'yaml'
+
+pwd = File.dirname(__FILE__)
+settings_path = "#{pwd}/settings.yml"
+
+settings = YAML::load_file(settings_path)
+session = GoogleDrive.saved_session("#{pwd}/#{settings['token_path']}" , nil, settings['client_id'], settings['client_secret'])
+
+# First worksheet
+ws = session.spreadsheet_by_key(settings["spreadsheet_key"]).worksheets[0]
+
+# Gets the last row
+last_row = ws.num_rows
+
+# Changes content of cells.
+ws[last_row + 1, 1] = ARGV[0]
+ws[last_row + 1, 2] = ARGV[1]
+ws.save()
+
+# Reloads the worksheet to get changes by other clients.
+ws.reload()
+
+puts "Google Spreadsheet updated"

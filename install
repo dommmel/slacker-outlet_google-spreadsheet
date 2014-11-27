@@ -1,0 +1,51 @@
+#!/usr/bin/env ruby
+
+require 'tmpdir'
+target_path = File.dirname(__FILE__)
+
+# Check for bundler
+unless system ("gem list -i bundler > /dev/null")
+  puts "Please install the bundler gem."
+  exit
+end
+
+# Bundler can't install gems into folders that contain spaces (doh)
+# so we have to do this little temp-dir dance
+if File.directory?("#{target_path}/.bundle")
+  puts "Found .bundle folder. Skipping bundle install..."
+else
+  Dir.mktmpdir do |dir|
+    puts "Installing bundled gems into temporary folder: #{dir}"
+    FileUtils.cp_r "Gemfile", dir
+    system "cd #{dir} && bundle install --standalone --path=.bundle"
+    puts "Moving gems to target folder: #{target_path}/.bundle"
+    FileUtils.mv "#{dir}/.bundle", "#{target_path}/.bundle"
+  end
+end
+
+# Load dependencies
+require 'rubygems'
+require_relative '.bundle/bundler/setup'
+require "google/api_client"
+require "google_drive"  
+require 'yaml'
+
+# Read the settings
+settings_path = "#{target_path}/settings.yml"
+settings = YAML::load_file(settings_path)
+
+# Check for google credentials (will print instructions if no token was saved before)
+puts "Checking google API authorization..."
+session = GoogleDrive.saved_session("#{target_path}/#{settings['token_path']}" , nil, settings['client_id'], settings['client_secret'])
+
+# Check for Spread key
+if settings["spreadsheet_key"].nil?
+  $stderr.print("Enter the key of the spreadsheet you want to write to: ")
+  spreadsheet_key = $stdin.gets().chomp()
+  settings["spreadsheet_key"] = spreadsheet_key
+  File.open(settings_path, 'w') do |f| 
+    f.write settings.to_yaml
+  end
+else
+  puts "Found spreadheet key. Skipping..."
+end
